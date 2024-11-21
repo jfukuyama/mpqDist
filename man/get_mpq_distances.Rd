@@ -4,15 +4,12 @@
 \alias{get_mpq_distances}
 \title{Compute MPQr distances for a range of values of r}
 \usage{
-get_mpq_distances(X, Q, rvec = r_transform(0:100/100))
+get_mpq_distances(X, tr, rvec = r_transform(0:100/100))
 }
 \arguments{
 \item{X}{A \eqn{n \times p} data matrix.}
 
-\item{Q}{A \eqn{p \times p} similarity matrix on the variables
-defining an inner product on the rows of \code{X}, can also be
-given as an eigendecomposition (formatted as the output from
-\code{eigen}).}
+\item{tr}{A tree (of class \code{phylo}) with p leaves.}
 }
 \value{
 A list containing distances between the rows of \code{X},

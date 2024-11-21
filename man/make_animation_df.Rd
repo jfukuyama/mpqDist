@@ -4,19 +4,19 @@
 \alias{make_animation_df}
 \title{Sets up a data frame for plotly to make an animation}
 \usage{
-make_animation_df(distance_list, fn, ...)
+make_animation_df(mpq_distances, fn, means_and_vars = NULL, ...)
 }
 \arguments{
-\item{distance_list}{A list of distance objects, for example, the
-\code{distance} element from the output of
-\code{get_mpq_distances}.}
-
 \item{fn}{A function to apply to each of the distance objects that
 creates a data frame with the variables in the animation. Its
 first argument should be a distance object. For example,
 \code{get_avg_distances_to_set}.}
 
 \item{...}{Extra arguments that are passed to fn.}
+
+\item{distance_list}{A list of distance objects, for example, the
+\code{distance} element from the output of
+\code{get_mpq_distances}.}
 }
 \value{
 A data frame that has one column called \code{frame} (which
