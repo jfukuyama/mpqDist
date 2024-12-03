@@ -183,6 +183,7 @@ plot_all_pairs <- function(physeq, sample_distances,
     }
     animation_df = make_animation_df(mpq_distances = mpq_distances,
                                      fn = mpq_and_sample_distances,
+                                     means_and_vars = NULL,
                                      sample_distances)
     p = ggplot(aes(x = sample_dist, y = mpq_dist, frame = frame), data = animation_df) +
         geom_point()
@@ -201,7 +202,6 @@ get_null_mean_and_variance <- function(physeq, rvec = r_transform(0:100/100)) {
     sds = apply(otu_table(physeq), 2, sd)
     means = numeric(length(rvec))
     sd_vec = numeric(length(rvec))
-    Qeig$values = Qeig$values / sum(Qeig$values) * ncol(Q)
     for(i in seq_along(rvec)) {
         r = rvec[i]
         evals = get_dr(Qeig, r)
@@ -212,11 +212,10 @@ get_null_mean_and_variance <- function(physeq, rvec = r_transform(0:100/100)) {
         weights = svd_sigmaVDrsqrt$d^2
         ## mean of mpq^2
         mu2 = sum(weights) * 2
-        means[i] = sqrt(mu2)
         ## var of mpq^2
         var2 = sum(weights^2) * 2
+        means[i] = sqrt(mu2) - .125 * mu2^(-3/2) * var2
         sd_vec[i] = sqrt(var2) / (2 * sqrt(mu2))
-        
     }
     return(list(means = means, sds = sd_vec))
 }
