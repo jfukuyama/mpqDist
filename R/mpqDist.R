@@ -22,20 +22,27 @@ get_mpq_distances <- function(X, tr, rvec = r_transform(0:100/100)) {
     XV = X %*% evecs
     distanceList = list()
     for(r in rvec) {
-        if(r == 0) {
-            evals = Qeig$values
-        } else if (r == 1) {
-            evals = rep(1, ncol(X))
-        } else {
-            evals = (rep(1/(1-r), ncol(X)) + r^(-1) * Qeig$values^(-1))^(-1)
-        }
-        evals = evals / sum(evals)
+        evals = get_dr(Qeig, r)
         XVDsqrt = XV * matrix(evals^(.5), nrow = nrow(XV), ncol = ncol(XV), byrow = TRUE)
         distanceList[[as.character(r)]] = dist(XVDsqrt)
     }
     out = list(distances = distanceList, r = rvec)
     return(out)
 }
+
+get_dr <- function(eig, r) {
+    eig$values = eig$values / sum(eig$values) * length(eig$values)
+    if(r == 0) {
+        evals = eig$values
+    } else if (r == 1) {
+        evals = rep(1, length(eig$values))
+    } else {
+        evals = (rep(1/(1-r), length(eig$values)) + r^(-1) * eig$values^(-1))^(-1)
+    }
+    evals = evals / sum(evals)
+    return(evals)
+}
+
 
 #' A transformation that tends to work better than a linear grid between 0 and 1
 #' @param r A value between 0 and 1
@@ -124,6 +131,7 @@ plot_dist_to_reference_samples <- function(physeq, reference_samples, x_variable
     distances = get_mpq_distances(otu_table(physeq), phy_tree(physeq))
     animation_df = make_animation_df(distances,
                                      get_avg_distances_to_set,
+                                     means_and_vars = NULL,
                                      reference_samples,
                                      sample_data(physeq))
     p = ggplot(aes_string(x = x_variable, y = "avg_dist", ...),
@@ -196,14 +204,7 @@ get_null_mean_and_variance <- function(physeq, rvec = r_transform(0:100/100)) {
     Qeig$values = Qeig$values / sum(Qeig$values) * ncol(Q)
     for(i in seq_along(rvec)) {
         r = rvec[i]
-        if(r == 0) {
-            evals = Qeig$values
-        } else if (r == 1) {
-            evals = rep(1, p)
-        } else {
-            evals = (rep(1/(1-r), p) + r^(-1) * Qeig$values^(-1))^(-1)
-        }
-        evals = evals / sum(evals)
+        evals = get_dr(Qeig, r)
         Drsqrt = sqrt(evals)
         sigmaV = evecs * sds
         sigmaVDrsqrt = t(t(sigmaV) * Drsqrt)
