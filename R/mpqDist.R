@@ -74,6 +74,9 @@ make_animation_df <- function(mpq_distances, fn, means_and_vars = NULL,  ...) {
             animation_df_list[[i]] = data.frame(frame = r_vec[i],
                                                 null_mean = means_and_vars$mean[i],
                                                 null_sd = means_and_vars$sds[i],
+                                                median = means_and_vars$median[i],
+                                                lower = means_and_vars$lower[i],
+                                                upper = means_and_vars$upper[i],
                                                 fn(distance_list[[i]], ...))
         }
     }
@@ -202,6 +205,9 @@ get_null_mean_and_variance <- function(physeq, rvec = r_transform(0:100/100)) {
     sds = apply(otu_table(physeq), 2, sd)
     means = numeric(length(rvec))
     sd_vec = numeric(length(rvec))
+    medians = numeric(length(rvec))
+    lower = numeric(length(rvec))
+    upper = numeric(length(rvec))
     for(i in seq_along(rvec)) {
         r = rvec[i]
         evals = get_dr(Qeig, r)
@@ -213,9 +219,23 @@ get_null_mean_and_variance <- function(physeq, rvec = r_transform(0:100/100)) {
         ## mean of mpq^2
         mu2 = sum(weights) * 2
         ## var of mpq^2
-        var2 = sum(weights^2) * 2
+        var2 = sum(weights^2) * 4
         means[i] = sqrt(mu2) - .125 * mu2^(-3/2) * var2
         sd_vec[i] = sqrt(var2) / (2 * sqrt(mu2))
+        medians[i] = sqrt(gx2inv(.5, weights, h = rep(2, length(weights))))
+        lower[i] = sqrt(gx2inv(.025, weights, h = rep(2, length(weights))))
+        upper[i] = sqrt(gx2inv(.975, weights, h = rep(2, length(weights))))
     }
-    return(list(means = means, sds = sd_vec))
+    return(list(means = means, sds = sd_vec, medians = medians, lower = lower, upper = upper))
 }
+
+gx2inv <- function(p, lambda, h) {
+    mu = sum(lambda * h)
+    var = 2 * sum(h * lambda^2)
+    root = stats::uniroot(
+                      function(x) 1 - davies(x, lambda, h)$Qq - p,
+                      interval = c(mu - 5 * sqrt(var), mu + 5 * sqrt(var))
+                  )$root
+    return(root)
+}
+
