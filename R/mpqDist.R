@@ -1,9 +1,3 @@
-## Functions to compute MPQ distances and to make plots
-
-## We will want one function that takes data and a tree and returns a list of distances
-
-## we will want another function to do the animated plots https://plotly.com/ggplot2/animations/
-
 #' Compute MPQr distances for a range of values of r
 #' @param X A \eqn{n \times p} data matrix.
 #' @param tr A tree (of class \code{phylo}) with p leaves.
@@ -32,12 +26,12 @@ get_mpq_distances <- function(X, tr, rvec = r_transform(0:100/100)) {
 
 get_dr <- function(eig, r) {
     eig$values = eig$values / sum(eig$values) * length(eig$values)
-    if(r == 0) {
+    if(r == 1) {
         evals = eig$values
-    } else if (r == 1) {
+    } else if (r == 0) {
         evals = rep(1, length(eig$values))
     } else {
-        evals = (rep(1/(1-r), length(eig$values)) + r^(-1) * eig$values^(-1))^(-1)
+        evals = (rep(1/r, length(eig$values)) + (1-r)^(-1) * eig$values^(-1))^(-1)
     }
     evals = evals / sum(evals)
     return(evals)
@@ -229,11 +223,12 @@ get_null_mean_and_variance <- function(physeq, rvec = r_transform(0:100/100)) {
     return(list(means = means, sds = sd_vec, medians = medians, lower = lower, upper = upper))
 }
 
+#' @importFrom CompQuadForm davies
 gx2inv <- function(p, lambda, h) {
     mu = sum(lambda * h)
     var = 2 * sum(h * lambda^2)
     root = stats::uniroot(
-                      function(x) 1 - davies(x, lambda, h)$Qq - p,
+                      function(x) 1 - CompQuadForm::davies(x, lambda, h)$Qq - p,
                       interval = c(mu - 5 * sqrt(var), mu + 5 * sqrt(var))
                   )$root
     return(root)
