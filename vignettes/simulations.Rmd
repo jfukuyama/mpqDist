@@ -28,6 +28,8 @@ library(tidyverse)
 library(viridis)
 library(phangorn)
 library(patchwork)
+library(treeDA)
+library(ggbrace)
 data(gentry)
 gentry
 ```
@@ -250,14 +252,13 @@ p_perfect = ggplot(data.frame(best_r = best_r_vec, clade_fraction = clade_sizes 
     scale_x_log10() +
     xlab("Clade fraction") +
     ylab("Best r") +
-    geom_point(aes(x = clade_fraction, y = best_r)) +
-    ggtitle("Perfect binary tree")
+    geom_point(aes(x = clade_fraction, y = best_r))
 ```
 
 ## Same as above but with the Gentry tree
 
 
-```{r}
+```{r, message = FALSE}
 tr = phy_tree(gentry)
 p = ntaxa(gentry)
 Q = ape::vcv(tr)
@@ -266,24 +267,26 @@ clades = Descendants(tr)
 best_r_vec = numeric(length(clades))
 clade_sizes = numeric(length(clades))
 time_since_divergence_of_mrca = numeric(length(clades))
+names = character(length(clades))
 tree_height = Q[1,1]
 for(i in 1:length(clades)) {
     if(length(clades[[i]]) > 1) {
         mrca = getMRCA(tr, clades[[i]])
+        name = ""
     } else {
         mrca = clades[[i]]
+        name = tr$tip.label[mrca]
     }
     parent_of_mrca = tr$edge[which(tr$edge[,2] == mrca),1]
 
     mu = 1:p %in% clades[[i]]
     mu = mu / sqrt(sum(mu^2))
     mutilde = convert_to_tree_basis(mu, Qeig)
-    ##d_noise = c(rep(0, p/2), rep(1, p/2)) + .01
-    ##d_noise = Qeig$values^(-2) / sum(Qeig$values^(-2))
     d_noise = rep(1, p)
     d_noise = d_noise / sum(d_noise)
     best_r_vec[i] = get_maximizing_r(mutilde, d_noise, Qeig)
     clade_sizes[i] = length(clades[[i]])
+    names[i] = name
     if(length(parent_of_mrca) > 0) {
         time_since_divergence_of_mrca[i] = tree_height - adephylo::distRoot(tr, parent_of_mrca)
     } else{
@@ -296,47 +299,65 @@ p_gentry =
     scale_x_log10() +
     xlab("Clade fraction") +
     ylab("Best r") +
-    stat_smooth(aes(x = clade_fraction, y = best_r), method = "gam",  se = FALSE) +
-    ggtitle("Gentry dataset tree")
+    stat_smooth(aes(x = clade_fraction, y = best_r), method = "gam",  se = FALSE)
 
-size_one_df = subset(data.frame(best_r = best_r_vec, time_since_divergence_of_mrca), clade_sizes == 1)
+size_one_df = subset(data.frame(best_r = best_r_vec,
+                                time_since_divergence_of_mrca,
+                                clade_sizes,
+                                name = names),
+                     clade_sizes == 1)
 size_one_df$Group = as.vector(tax_table(gentry)[,"group"])
+size_one_df$Group[is.na(size_one_df$Group)] = "Angiosperms"
+size_one_df$Order = as.vector(tax_table(gentry)[,"order"])
+size_one_df |>
+    group_by(Order)|>
+    summarise(mean_best_r = round(mean(best_r), digits = 2), num_species = length(best_r)) |>
+    arrange(desc(mean_best_r)) |>
+    head(n = 12) |>
+    knitr::kable(format = "latex")
+
+##orders_to_label = table(size_one_df$Order) |> sort(decreasing = TRUE) |> names() |> head()
+orders_to_label = c("Pinales", "Ranunculales", "Gentianales", "Fagales", "Alismatales", "Sapindales", "Malpighiales")
+size_one_df$Order[!(size_one_df$Order %in% orders_to_label)] = NA
+leaf_positions = get_leaf_position(phy_tree(gentry), ladderize = FALSE)
+size_one_df_with_position = merge(size_one_df, leaf_positions, by.x = "name", by.y = "OTU")
+tr_plot = plot_tree(tr, ladderize = FALSE) + coord_flip() +
+    scale_x_reverse() +
+    theme(panel.border = element_blank())
+manual_palette = c(scales::hue_pal()(7), "gray")
+names(manual_palette) = c(orders_to_label, "Other")
+best_r_plot =
+    ggplot(size_one_df_with_position)+
+    geom_point(aes(y = best_r, x = otu.pos, color = fct_explicit_na(Order, na_level = "Other")), size = .7) +
+    xlab("") +
+    theme(axis.ticks.x = element_blank(),
+          axis.text.x = element_blank(),
+          panel.border = element_blank()) +
+    ylab("Best r") +
+    scale_color_manual(values = manual_palette, "Order") +
+    coord_cartesian(clip = "off")
+best_r_plot_with_braces = best_r_plot +
+    stat_brace(aes(x = otu.pos, y =0, color = Group, label = Group),width = .05, bending=3, distance = .03, rotate = 180) +
+    stat_bracetext(aes(x = otu.pos, y =0, color = Group, label = Group), distance = .08, rotate = 180) +
+    theme(legend.position = "none")
+
+best_r_legend = cowplot::get_legend(best_r_plot)
+best_r_and_tree_plot = combine_plot_and_tree(best_r_plot_with_braces, tr_plot, tree.height = 3)
 p_size_one = ggplot(size_one_df) +
     geom_point(aes(x = time_since_divergence_of_mrca, y = best_r, shape = Group), na.rm = TRUE) +
     scale_shape(na.translate = FALSE) + ylab("Best r") + xlab("Distance to parent node") +
     ggtitle("Individual species in Gentry dataset tree")
 ```
 
-```{r}
-pdf("best-r-by-clade-size.pdf", width = 7, height=5)
-(p_perfect + p_gentry) / p_size_one
+The code below was for my use writing the paper, it is not evaluated in the compiled version.
+```{r, eval = FALSE}
+pdf("best-r-by-clade-size.pdf", width = 7, height=2.3)
+p_perfect + p_gentry
 dev.off()
-```
-
-
-```{r}
-p = 2^k
-otu_tab_perfect = matrix(rnorm(n * p, sd = 1 / sqrt(p)), nrow = n, ncol = p)
-colnames(otu_tab_perfect) = tr$tip.label
-## this is a clade of size 203, so roughly half of the tree, appears to be mainly Magnoliales
-target_clade = 1:p %in% 1:(p/128)
-target_clade = target_clade / sum(target_clade^2)
-tree_additive_effect = outer(seq(-1,1,length.out=nrow(otu_tab_perfect)), target_clade)
-otu_tab_perfect = otu_tab_perfect + tree_additive_effect
-sim_perfect_tree = phyloseq(phy_tree(tr), otu_table(otu_tab_perfect, taxa_are_rows = FALSE),
-                            sample_data(data.frame(tree_score = seq(-1, 1, length.out = n))))
-base_sample = 1
-nmv = get_null_mean_and_variance(sim_perfect_tree)
-mpq_distances = get_mpq_distances(otu_table(sim_perfect_tree), phy_tree(sim_perfect_tree))
-animation_df = make_animation_df(mpq_distances, get_avg_distances_to_set, means_and_vars = nmv, base_sample, sample_data(sim_perfect_tree))
-
-p = ggplot(aes(x = tree_score, y = (avg_dist - null_mean) / null_sd), data = animation_df) +
-    geom_point(aes(frame = frame)) +
-#    geom_hline(aes(yintercept = null_mean, frame = frame)) +
-#    geom_hline(aes(yintercept = null_mean - 2 * null_sd, frame = frame)) +
-#    geom_hline(aes(yintercept = null_mean + 2 * null_sd, frame = frame)) +
-    stat_smooth(aes(frame = frame), se = FALSE) +
-    scale_x_reverse() +
-    scale_color_viridis() 
-ggplotly(p)
+pdf("best-r-singletons-with-tree.pdf", width = 5.8, height = 3)
+best_r_and_tree_plot |> plot()
+dev.off()
+pdf("best-r-order-legend.pdf", width = 1.2, height = 3)
+plot(best_r_legend)
+dev.off()
 ```
