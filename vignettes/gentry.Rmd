@@ -1,5 +1,5 @@
 ---
-title: "Beta Diversity Analysis of Gentry Data"
+title: "Interactive plot tutorial"
 output: tufte::tufte_html
 toc: false
 vignette: >
@@ -19,10 +19,10 @@ knitr::opts_chunk$set(
 # Introduction
 
 In this vignette, we will show how to use the MPQ distance family to investigate patterns of beta diversity.
-In particular, we will analyze the dataset collected by Alwyn Gentry way back when.
-Our analysis here is based on a version of the dataset that David Zeleny posted on his `anadat-r` repository.
-A phylogeny was built from the taxonomic information using `S.PhyloMaker`, and higher-order taxonomic information was inferred using `taxonlookup`.
-We did a good deal of data cleaning, and all of the choices we made can be seen in the script at `data-raw/gentry.R`.
+To illustrate the tool, we will analyze the dataset collected by Alwyn Gentry way back when.
+Our analysis here is based on a version of the dataset that David Zeleny posted on his [`anadat-r`](https://www.davidzeleny.net/anadat-r/doku.php/en:start) repository.
+A phylogeny was built from the taxonomic information using [`S.PhyloMaker`](https://github.com/jinyizju/S.PhyloMaker), and higher-order taxonomic information was inferred using [`taxonlookup`](https://github.com/traitecoevo/taxonlookup).
+We did a good deal of data cleaning, and all of the choices we made can be seen in the script at `data-raw/gentry.R` in this package.
 
 # Seting up and transformations
 
@@ -70,10 +70,11 @@ ggplot(subset(abundance_df, abundances > 0)) + geom_histogram(aes(x = abundances
 # Computing the distances
 
 The `get_mpq_distances` function will compute the full range of MPQr distances, with r taking values between 0 and 1.
+r = 0 corresponds to the standard Euclidean distance, small values of r can be interpreted as measuring "terminal" phylogenetic dissimilarity, and large values of r can be interpreted as measuring "basal" phylogenetic dissimilarity.
 Its first argument should be a matrix (or something that inherits from a matrix, like the `otu_table` object below).
 Its second argument should be a phylogenetic tree of class `phylo`.
-You can specify a set of values of `r` to compute if you would like.
-The default is to take a range of 101 values between 0 and 1 such that the are spaced more closely near 0 and 1 and farther apart in the middle.
+You can specify a set of values of r to compute if you would like.
+If you don't specify anything, the default is to take a range of 101 values between 0 and 1 such that the are spaced more closely near 0 and 1 and farther apart in the middle.
 There is not a good theoretical reason for this, but it has worked well in all the examples we have looked at.
 ```{r}
 distances = get_mpq_distances(otu_table(gentry_log), phy_tree(gentry_log))
@@ -84,9 +85,7 @@ distances = get_mpq_distances(otu_table(gentry_log), phy_tree(gentry_log))
 It is easiest to visualize the family of distances with an animated plot.
 This package includes some helper functions that allow the user to make a couple of different kinds of plots and gives templates so as to allow the user to make custom versions if the ones included here are not suitable.
 
-## Built-in plots
-
-### Plot distance to a reference set
+## Plot distance to a reference set
 
 The first kind of plot supported is one that shows the distance of each individual sample to a set of "reference" samples.
 This sort of plot would be of use if, for example, you had samples collected from sites along a river and you wanted to visualize the distance between each site and a reference site at one end of the river.
@@ -126,7 +125,7 @@ p = plot_dist_to_reference_samples(physeq = gentry_log, reference_samples = equa
 ggplotly(p)
 ```
 
-### Plot all pairs of distances
+## Plot all pairs of distances
 
 Another kind of plot that can be useful is one where the difference between each pair of sites is plotted.
 The standard here would be to have one point for each pair of samples, to plot the MPQr distance on the vertical axis and the geographical distance on the horizontal axis.
@@ -162,7 +161,9 @@ ggplotly(p)
 
 ## Helper functions for custom plots
 
-Detailed description of ggplotly, the package we use for interactive plots, is available elsewhere, but briefly, to convert a standard ggplot2 plot to an animated plot with ggplotly, you modify the plotting data frame so that it has an extra column that specifies the "frame" of the animation, add that as part of the aesthetic mapping (e.g. `aes(frame = frame)`) in the ggplot, and then call the `ggplotly` function on the resulting `ggplot` object.
+The package also includes helper functions that allow for more customization, but since the interactive plots are based on ggplotly, some knowledge of how ggplotly works is necessary to use these functions.
+Briefly, to convert a standard ggplot2 plot to an animated plot with ggplotly, you modify the plotting data frame so that it has an extra column that specifies the "frame" of the animation, add that as part of the aesthetic mapping (e.g. `aes(frame = frame)`) in the ggplot, and then call the `ggplotly` function on the resulting `ggplot` object.
+For more details, see the [ggplotly documentation on animations](https://plotly.com/ggplot2/animations/).
 
 ### The `make_animation_df` function
 
@@ -206,37 +207,48 @@ ggplotly(p)
 ```
 
 
-### Code to create plots in manuscript
+# Code to create plots in manuscript
 
 The following code makes a plot that is in the manuscript, comparing MPQr distances to each other, to Bray-Curtis, and to distances computed on agglomerated species counts.
 
 ```{r}
 mpq_distances = get_mpq_distances(otu_table(gentry_log), phy_tree(gentry_log))
 
+## compute Bray-Curtis dissimilarity on untransformed data
 mpq_distances$distances[["bray"]] =  distance(gentry, method = "bray")
 mpq_distances$r = c(mpq_distances$r, "bray")
-##tax_table(gentry) = tax_table(gentry)[,4:1]
+## agglomerate the untransformed data to order level, then clr-transform the agglomerated data
 gentry_order_glom = tax_glom(gentry, taxrank = "order")
 gentry_log_order_glom = gentry_order_glom
 otu_table(gentry_log_order_glom) = otu_table(clr(otu_table(gentry_order_glom) + 1), taxa_are_rows = FALSE)
+## ## agglomerate the untransformed data to order level, then clr-transform the agglomerated data
 gentry_group_glom = tax_glom(gentry, taxrank = "group")
 gentry_log_group_glom = gentry_group_glom
 otu_table(gentry_log_group_glom) = otu_table(clr(otu_table(gentry_group_glom) + 1), taxa_are_rows = FALSE)
 
+## compute Euclidean distances on the clr-transformed agglomerated data
 mpq_distances$distances[["order_glom"]] = dist(otu_table(gentry_log_order_glom))
 mpq_distances$r = c(mpq_distances$r, "order_glom")
 mpq_distances$distances[["group_glom"]] = dist(otu_table(gentry_log_group_glom))
 mpq_distances$r = c(mpq_distances$r, "group_glom")
 
+## we will compare to the northern temperate samples
 temperate_samples = sample_names(gentry_log)[which(sample_data(gentry_log)$Lat >= 23.5 & sample_data(gentry_log)$Lat <= 66.5)]
 
+
+## this is a roundabout way of doing things, but make_animation_df
+## here sets up the data for plotting for the MPQr distances + Bray
+## Curtis + Euclidean distance on agglomerated data. I will use a subset of it to plot later
 animation_df = make_animation_df(mpq_distances, get_avg_distances_to_set, means_and_vars = NULL, temperate_samples, sample_data(gentry_log))
 
+## I will be plotting mpqr distances with r = 0, 1, .7 + bray-curtis + Euclidean distance on two levels of agglomeration
 mid_r = "0.712889645782536"
 animation_df_sub = subset(animation_df, frame %in% c(mid_r, "0", "1", "bray", "order_glom", "group_glom"))
+## this data frame will allow me to plot averages in 15-degree-of-latitude bins
 animation_df_summarised = animation_df_sub |>
     mutate(latitude_bin = round(Lat / 15) * 15) |>
     group_by(frame, latitude_bin) |> summarise(mean_in_bin = mean(avg_dist), se_in_bin = sd(avg_dist) / sqrt(length(avg_dist)))
+## making frame into an ordered factor so that the facots are plotted in the order I want
 animation_df_sub$frame = factor(animation_df_sub$frame,
                                 levels = c("0", mid_r, "1", "bray", "order_glom", "group_glom"),
                                 ordered = TRUE)
@@ -244,12 +256,13 @@ animation_df_summarised$frame = factor(animation_df_summarised$frame,
                                        levels = c("0", mid_r, "1", "bray", "order_glom", "group_glom"),
                                        ordered = TRUE)
 
+## to do custom facet labels
 frame_labels <- c("0" = "r = 0",
                   mid_r = paste("r = ", round(as.numeric(mid_r), digits = 2), sep = ""),
                   "1" = "r = 1",
                   "bray" = "Bray-Curtis",
                   "order_glom" = "Glommed to order",
-                  "group_glom" = "Glommed to division")
+                  "group_glom" = "Glommed to phylum")
 names(frame_labels)[2] = mid_r
 #pdf("gentry-latitudinal-distance.pdf", width = 7, height = 5)
 ggplot(data = animation_df_sub) +
@@ -259,6 +272,10 @@ ggplot(data = animation_df_sub) +
                       ymax = mean_in_bin + 2 * se_in_bin),
                   data = animation_df_summarised,
                   width = 6) +
+    annotate("rect",
+           xmin = 23.5, xmax = 66.5,   # x-range to shade
+           ymin = -Inf, ymax = Inf,  # full y-range
+           alpha = 0.2, fill = "blue") + 
     geom_point(aes(x = latitude_bin, y= mean_in_bin),
                data = animation_df_summarised) +
     geom_line(aes(x = latitude_bin, y= mean_in_bin),
