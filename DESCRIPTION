@@ -14,7 +14,7 @@ Suggests:
     rmarkdown
 VignetteBuilder: knitr
 Depends: 
-    R (>= 2.10)
+    R (>= 3.5)
 Imports:
     CompQuadForm
 LazyData: true
