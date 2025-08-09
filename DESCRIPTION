@@ -1,12 +1,11 @@
 Package: mpqDist
-Title: What the Package Does (One Line, Title Case)
+Title: MPQ distance computations
 Version: 0.0.0.9000
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-    license
+    person("Julia", "Fukuyama", , "julia.fukuyama@gmail.com", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-7590-5563"))
+Description: Computes a family of phylogenetically-informed distances for use with ecology data. Also includes functionality to create interactive plots based on those distances.
+License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
@@ -16,4 +15,7 @@ Suggests:
 VignetteBuilder: knitr
 Depends: 
     R (>= 2.10)
+Imports:
+    CompQuadForm
 LazyData: true
+URL: https://jfukuyama.github.io/mpqDist/
