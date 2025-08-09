@@ -2,10 +2,6 @@
 title: "Simulation examples for MPQ distances"
 output: tufte::tufte_html
 toc: false
-vignette: >
-  %\VignetteIndexEntry{gentry}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
 ---
 
 ```{r, include = FALSE}
@@ -30,6 +26,9 @@ library(phangorn)
 library(patchwork)
 library(treeDA)
 library(ggbrace)
+library(vegan)
+library(picante)
+set.seed(0)
 data(gentry)
 gentry
 ```
@@ -54,6 +53,8 @@ otu_table(sim_hetero) = otu_table(sim_hetero_matrix, taxa_are_rows = FALSE)
 ```
 
 ## Homoskedastic case
+
+For the first simulation, we are 
 
 ```{r}
 base_sample = 1
@@ -132,7 +133,7 @@ make_anticorrelated_noise <- function(n, tr) {
 
 set.seed(0)
 p = 300
-n = 100
+n = 25
 tr = rtree(p)
 alt = sample(c(-1, 1), n, replace = TRUE)
 precip = sample(c(-1, 1), n, replace = TRUE)
@@ -146,8 +147,22 @@ colnames(X) = tr$tip.label
 two_effect_sim = phyloseq(otu_table(X, taxa_are_rows = FALSE), phy_tree(tr), sample_data(data.frame(alt = alt, precip = precip)))
 #nmv = get_null_mean_and_variance(two_effect_sim)
 mpq_distances = get_mpq_distances(otu_table(two_effect_sim), phy_tree(two_effect_sim))
-animation_df_alt = make_animation_df(mpq_distances, get_avg_distances_to_set, means_and_vars = nmv, base_sample = which.min(alt), sample_data(two_effect_sim))
-animation_df_precip = make_animation_df(mpq_distances, get_avg_distances_to_set, means_and_vars = nmv, base_sample = which.min(alt), sample_data(two_effect_sim))
+animation_df_alt = make_animation_df(mpq_distances, get_avg_distances_to_set,
+                                     means_and_vars = nmv,
+                                     base_sample = which.min(alt),
+                                     sample_data(two_effect_sim))
+animation_df_alt = animation_df_alt |>
+    subset(avg_dist > 0) |>
+    group_by(frame) |>
+    mutate(p_val = wilcox.test(avg_dist ~ alt)$p.value, max_dist = max(avg_dist))
+animation_df_precip = make_animation_df(mpq_distances,
+                                        get_avg_distances_to_set,
+                                        means_and_vars = nmv,
+                                        base_sample = which.min(precip), sample_data(two_effect_sim))
+animation_df_precip = animation_df_precip |>
+    subset(avg_dist > 0) |>
+    group_by(frame) |>
+    mutate(p_val = wilcox.test(avg_dist ~ precip)$p.value, max_dist = max(avg_dist))
 ## p1 = ggplot(aes(x = factor(alt), y = avg_dist), data = animation_df_alt) +
 ##     geom_boxplot(aes(frame = frame))
 ## ggplotly(p1)
@@ -157,22 +172,31 @@ animation_df_precip = make_animation_df(mpq_distances, get_avg_distances_to_set,
 ## ggplotly(p3)
 ```
 
+
 ```{r}
 math_labels <- c(
   "0" = "r = 0",
   "0.5" = "r = .5",
   "1" = "r = 1"
 )
+df_alt_label = subset(animation_df_alt, (frame %in% c(0,1) | (frame >= .49 & frame <= .51)) & avg_dist > 0)[,c("frame", "max_dist", "p_val")] |> unique()
+df_alt_precip = subset(animation_df_precip, (frame %in% c(0,1) | (frame >= .49 & frame <= .51)) & avg_dist > 0)[,c("frame", "max_dist", "p_val")] |> unique()
 p1 = ggplot(subset(animation_df_alt, (frame %in% c(0,1) | (frame >= .49 & frame <= .51)) & avg_dist > 0)) +
     geom_boxplot(aes(x = factor(alt), y = avg_dist)) +
     facet_wrap(~ as.factor(frame), scales = "free_y", labeller = labeller(.default = math_labels)) +
     scale_x_discrete(breaks = c(-1, 1), labels = c("low", "high")) +
-    xlab("Altitude")
+    xlab("Altitude") +
+    geom_label(aes(x = 1, y = max_dist + .2, label = paste0("p = ", signif(p_val, 3))),
+               size = 3, label.padding = unit(.5, "lines"), label.size = 0,
+              data = df_alt_label)
 p2 = ggplot(subset(animation_df_precip, (frame %in% c(0,1) | (frame >= .49 & frame <= .51)) & avg_dist > 0)) +
     geom_boxplot(aes(x = factor(precip), y = avg_dist)) +
     facet_wrap(~ as.factor(frame), scales = "free_y", labeller = labeller(.default = math_labels)) +
     scale_x_discrete(breaks = c(-1, 1), labels = c("wet", "dry")) +
-    xlab("Moisture")
+    xlab("Moisture") +
+    geom_label(aes(x = 1, y = max_dist + .2, label = paste0("p = ", signif(p_val, 3))),
+               size = 3, label.padding = unit(.5, "lines"), label.size = 0,
+              data = df_alt_precip)
 h_patch <- p1 / p2 & ylab(NULL) & theme(plot.margin = margin(5.5, 5.5, 5.5, 2))
 #pdf("two-factor-sim.pdf", width = 6, height = 4)
 wrap_elements(h_patch) +
@@ -184,180 +208,101 @@ wrap_elements(h_patch) +
 #dev.off()
 ```
 
-
-## More systematic, and in the tree basis
+PERMANOVA version, with fewer samples:
 ```{r}
-convert_to_tree_basis <- function(mu, Qeig) {
-    mutilde <- t(Qeig$vectors)%*% mu
-}
+mpq_dist_list = get_mpq_distances(X, tr = tr, r = c(0, .5,1))[[1]]
+adonis2(mpq_dist_list[[1]] ~ factor(alt), permutations = 9999)
+adonis2(mpq_dist_list[[2]] ~ factor(alt), permutations = 9999)
+adonis2(mpq_dist_list[[3]] ~ factor(alt), permutations = 9999)
+adonis2(mpq_dist_list[[1]] ~ factor(precip), permutations = 9999)
+adonis2(mpq_dist_list[[2]] ~ factor(precip), permutations = 9999)
+adonis2(mpq_dist_list[[3]] ~ factor(precip), permutations = 9999)
 
-compare_to_null_tree_basis <- function(mutilde, r, d_noise, Qeig) {
-    dr = mpqDist:::get_dr(Qeig, r)
-    w = dr * d_noise
-    exp_val = t(mutilde * dr) %*% mutilde
-    variance = 2 * sum(w^2)
-    return(exp_val / sqrt(variance))
-}
 
-get_maximizing_r <- function(mutilde, d_noise, Qeig, rvec = mpqDist:::r_transform(0:100/100)) {
-    ratios = sapply(rvec, function(r) compare_to_null_tree_basis(mutilde, r, d_noise, Qeig))
-    return(rvec[which.max(ratios)])
-}
 ```
 
+Other metrics
 ```{r}
-p = ntaxa(gentry)
-Q = vcv(phy_tree(gentry))
-Qeig = eigen(Q)
-best_r_vec = numeric(p)
-for(i in 1:p) {
-    mutilde = rep(0, p)
-    mutilde[i] = 1
-    ##d_noise = c(rep(0, p/2), rep(1, p/2)) + .01
-    ##d_noise = Qeig$values^(-2) / sum(Qeig$values^(-2))
-    d_noise = rep(1, p)
-    d_noise = d_noise / sum(d_noise)
-    best_r_vec[i] = get_maximizing_r(mutilde, d_noise, Qeig)
-}
-ggplot(data.frame(best_r = best_r_vec, index = 1:p)) +
-    geom_point(aes(x = index, y = best_r))
+## phylosor
+X_trunc = X
+X_trunc[X < quantile(X, .5)] = 0
+phylosor_sim = phylosor(X_trunc, tr) |> as.matrix()
+phylosor_vs_alt = data.frame(dist = phylosor_sim[which.min(alt),],
+                             alt = alt,
+                             measure = "PhyloSor") |>
+    subset(dist > 0)
+phylosor_vs_precip = data.frame(dist = phylosor_sim[which.min(precip),],
+                                precip = precip,
+                                measure = "PhyloSor") |>
+    subset(dist > 0)
 
-```
+## raosd
+ultra_tr = chronos(tr, lambda = 1)
+raod_dist = raoD(X, phy=ultra_tr)$H
+
+raod_vs_alt = data.frame(dist = raod_dist[which.min(alt),],
+                         alt = alt,
+                         measure = "Rao's D") |>
+    subset(dist > 0)
+raod_vs_precip = data.frame(dist = raod_dist[which.min(precip),],
+                            precip = precip,
+                            measure = "Rao's D") |>
+    subset(dist > 0)
+
+## unifrac
+uf_dist = UniFrac(phyloseq(otu_table(X_trunc, taxa_are_rows = FALSE), phy_tree(tr)), weighted = FALSE, normalized = TRUE, parallel = FALSE, fast = TRUE) |> as.matrix()
+uf_vs_alt = data.frame(dist = uf_dist[which.min(alt),],
+                       alt = alt,
+                       measure = "UniFrac") |>
+    subset(dist > 0)
+uf_vs_precip = data.frame(dist = uf_dist[which.min(precip),],
+                          precip = precip,
+                          measure = "UniFrac") |> subset(dist > 0)
+
+alternate_measures_alt = rbind(phylosor_vs_alt, raod_vs_alt, uf_vs_alt) |>
+    mutate(measure = fct_relevel(factor(measure), 
+                                 "PhyloSor", 
+                                 "UniFrac", 
+                                 "Rao's D")) |>
+    group_by(measure) |>
+    mutate(p_val = wilcox.test(dist ~ alt)$p.value, max_dist = max(dist))
+
+df_2_alt_label = alternate_measures_alt[,c("p_val", "max_dist", "measure")] |> unique()
+
+alternate_measures_precip = rbind(phylosor_vs_precip, raod_vs_precip, uf_vs_precip) |>
+    mutate(measure = fct_relevel(measure, 
+                                 "PhyloSor", 
+                                 "UniFrac", 
+                                 "Rao's D")) |>
+    group_by(measure) |>
+    mutate(p_val = wilcox.test(dist ~ precip)$p.value, max_dist = max(dist))
+df_2_precip_label = alternate_measures_precip[,c("p_val", "max_dist", "measure")] |> unique()
+p_alternate_alt = ggplot(alternate_measures_alt) +
+    geom_boxplot(aes(x = factor(alt), y = dist)) +
+    facet_wrap(~ measure, scales = "free_y") +
+    scale_x_discrete(breaks = c(-1, 1), labels = c("low", "high")) +
+    xlab("Altitude") +
+    geom_label(aes(x = 1, y = max_dist, label = paste0("p = ", signif(p_val, 3))),
+               size = 3, label.padding = unit(.5, "lines"), label.size = 0,
+               data = df_2_alt_label)
+
+p_alternate_precip = ggplot(alternate_measures_precip) +
+    geom_boxplot(aes(x = factor(precip), y = dist)) +
+    facet_wrap(~ measure, scales = "free_y") +
+    scale_x_discrete(breaks = c(-1, 1), labels = c("wet", "dry")) +
+    xlab("Moisture") +
+    geom_label(aes(x = 1, y = max_dist, label = paste0("p = ", signif(p_val, 3))),
+               size = 3, label.padding = unit(.5, "lines"), label.size = 0,
+              data = df_2_precip_label)
 
 
-## Make an example with the perfect binary tree
-
-```{r}
-k = 8
-p = 2^k
-tr = ape::stree(n = 2^k, type = "balanced")
-tr$edge.length = rep(1, nrow(tr$edge))
-Q = ape::vcv(tr)
-Qeig = eigen(Q)
-clades = Descendants(tr)
-best_r_vec = numeric(length(clades))
-clade_sizes = numeric(length(clades))
-for(i in 1:length(clades)) {
-    mu = 1:p %in% clades[[i]]
-    mu = mu / sqrt(sum(mu^2))
-    mutilde = convert_to_tree_basis(mu, Qeig)
-    ##d_noise = c(rep(0, p/2), rep(1, p/2)) + .01
-    ##d_noise = Qeig$values^(-2) / sum(Qeig$values^(-2))
-    d_noise = rep(1, p)
-    d_noise = d_noise / sum(d_noise)
-    best_r_vec[i] = get_maximizing_r(mutilde, d_noise, Qeig)
-    clade_sizes[i] = length(clades[[i]])
-}
-p_perfect = ggplot(data.frame(best_r = best_r_vec, clade_fraction = clade_sizes / p)) +
-    scale_x_log10() +
-    xlab("Clade fraction") +
-    ylab("Best r") +
-    geom_point(aes(x = clade_fraction, y = best_r))
-```
-
-## Same as above but with the Gentry tree
-
-
-```{r, message = FALSE}
-tr = phy_tree(gentry)
-p = ntaxa(gentry)
-Q = ape::vcv(tr)
-Qeig = eigen(Q)
-clades = Descendants(tr)
-best_r_vec = numeric(length(clades))
-clade_sizes = numeric(length(clades))
-time_since_divergence_of_mrca = numeric(length(clades))
-names = character(length(clades))
-tree_height = Q[1,1]
-for(i in 1:length(clades)) {
-    if(length(clades[[i]]) > 1) {
-        mrca = getMRCA(tr, clades[[i]])
-        name = ""
-    } else {
-        mrca = clades[[i]]
-        name = tr$tip.label[mrca]
-    }
-    parent_of_mrca = tr$edge[which(tr$edge[,2] == mrca),1]
-
-    mu = 1:p %in% clades[[i]]
-    mu = mu / sqrt(sum(mu^2))
-    mutilde = convert_to_tree_basis(mu, Qeig)
-    d_noise = rep(1, p)
-    d_noise = d_noise / sum(d_noise)
-    best_r_vec[i] = get_maximizing_r(mutilde, d_noise, Qeig)
-    clade_sizes[i] = length(clades[[i]])
-    names[i] = name
-    if(length(parent_of_mrca) > 0) {
-        time_since_divergence_of_mrca[i] = tree_height - adephylo::distRoot(tr, parent_of_mrca)
-    } else{
-        time_since_divergence_of_mrca[i] = 0
-    }
-}
-p_gentry =
-    ggplot(data.frame(best_r = best_r_vec, clade_fraction = clade_sizes / p)) +
-    geom_point(aes(x = clade_fraction, y = best_r)) +
-    scale_x_log10() +
-    xlab("Clade fraction") +
-    ylab("Best r") +
-    stat_smooth(aes(x = clade_fraction, y = best_r), method = "gam",  se = FALSE)
-
-size_one_df = subset(data.frame(best_r = best_r_vec,
-                                time_since_divergence_of_mrca,
-                                clade_sizes,
-                                name = names),
-                     clade_sizes == 1)
-size_one_df$Group = as.vector(tax_table(gentry)[,"group"])
-size_one_df$Group[is.na(size_one_df$Group)] = "Angiosperms"
-size_one_df$Order = as.vector(tax_table(gentry)[,"order"])
-size_one_df |>
-    group_by(Order)|>
-    summarise(mean_best_r = round(mean(best_r), digits = 2), num_species = length(best_r)) |>
-    arrange(desc(mean_best_r)) |>
-    head(n = 12) |>
-    knitr::kable(format = "latex")
-
-##orders_to_label = table(size_one_df$Order) |> sort(decreasing = TRUE) |> names() |> head()
-orders_to_label = c("Pinales", "Ranunculales", "Gentianales", "Fagales", "Alismatales", "Sapindales", "Malpighiales")
-size_one_df$Order[!(size_one_df$Order %in% orders_to_label)] = NA
-leaf_positions = get_leaf_position(phy_tree(gentry), ladderize = FALSE)
-size_one_df_with_position = merge(size_one_df, leaf_positions, by.x = "name", by.y = "OTU")
-tr_plot = plot_tree(tr, ladderize = FALSE) + coord_flip() +
-    scale_x_reverse() +
-    theme(panel.border = element_blank())
-manual_palette = c(scales::hue_pal()(7), "gray")
-names(manual_palette) = c(orders_to_label, "Other")
-best_r_plot =
-    ggplot(size_one_df_with_position)+
-    geom_point(aes(y = best_r, x = otu.pos, color = fct_explicit_na(Order, na_level = "Other")), size = .7) +
-    xlab("") +
-    theme(axis.ticks.x = element_blank(),
-          axis.text.x = element_blank(),
-          panel.border = element_blank()) +
-    ylab("Best r") +
-    scale_color_manual(values = manual_palette, "Order") +
-    coord_cartesian(clip = "off")
-best_r_plot_with_braces = best_r_plot +
-    stat_brace(aes(x = otu.pos, y =0, color = Group, label = Group),width = .05, bending=3, distance = .03, rotate = 180) +
-    stat_bracetext(aes(x = otu.pos, y =0, color = Group, label = Group), distance = .08, rotate = 180) +
-    theme(legend.position = "none")
-
-best_r_legend = cowplot::get_legend(best_r_plot)
-best_r_and_tree_plot = combine_plot_and_tree(best_r_plot_with_braces, tr_plot, tree.height = 3)
-p_size_one = ggplot(size_one_df) +
-    geom_point(aes(x = time_since_divergence_of_mrca, y = best_r, shape = Group), na.rm = TRUE) +
-    scale_shape(na.translate = FALSE) + ylab("Best r") + xlab("Distance to parent node") +
-    ggtitle("Individual species in Gentry dataset tree")
-```
-
-The code below was for my use writing the paper, it is not evaluated in the compiled version.
-```{r, eval = FALSE}
-pdf("best-r-by-clade-size.pdf", width = 7, height=2.3)
-p_perfect + p_gentry
-dev.off()
-pdf("best-r-singletons-with-tree.pdf", width = 5.8, height = 3)
-best_r_and_tree_plot |> plot()
-dev.off()
-pdf("best-r-order-legend.pdf", width = 1.2, height = 3)
-plot(best_r_legend)
-dev.off()
+h_patch <- p_alternate_alt / p_alternate_precip & ylab(NULL) & theme(plot.margin = margin(5.5, 5.5, 5.5, 2))
+#pdf("two-factor-sim-alternate-measures.pdf", width = 6, height = 4)
+wrap_elements(h_patch) +
+  labs(tag = "Distance to reference sample") +
+  theme(
+    plot.tag = element_text(size = rel(1), angle = 90),
+    plot.tag.position = "left"
+  )
+#dev.off()
 ```
