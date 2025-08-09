@@ -19,6 +19,8 @@ and the value of \eqn{r} that was used (\code{r}).
 Compute MPQr distances for a range of values of r
 }
 \examples{
-data(AntibioticSmall)
-out.agpca = adaptivegpca(AntibioticSmall$X, AntibioticSmall$Q, k = 2)
+data(small_otutab)
+data(small_tree)
+get_mpq_distances(small_otutab, small_tree, rvec = c(0,.5,1))
+
 }

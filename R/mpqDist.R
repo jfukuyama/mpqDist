@@ -4,8 +4,10 @@
 #' @return A list containing distances between the rows of \code{X},
 #'     and the value of \eqn{r} that was used (\code{r}).
 #' @examples
-#' data(AntibioticSmall)
-#' out.agpca = adaptivegpca(AntibioticSmall$X, AntibioticSmall$Q, k = 2)
+#' data(small_otutab)
+#' data(small_tree)
+#' get_mpq_distances(small_otutab, small_tree, rvec = c(0,.5,1))
+#' 
 #' @export
 get_mpq_distances <- function(X, tr, rvec = r_transform(0:100/100)) {
     Q = ape::vcv(tr, scale = FALSE)
