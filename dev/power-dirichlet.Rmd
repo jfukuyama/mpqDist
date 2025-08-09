@@ -1,0 +1,96 @@
+---
+title: "Power analysis with Dirichlet distribution"
+output: 
+  tufte::tufte_html
+---
+
+```{r}
+#' Find the r that corresponds to maximal power for Dirichlet-distributed variates
+#'
+#' Searches over a grid of values of `r` to find the one that maximizes the probability of rejecting the null hypothesis using a permutation test
+#'
+#' @param 
+get_maximizing_r_dirichlet <- function(alpha1, alpha2, n_samples, Qeig, rvec = mpqDist:::r_transform(0:100/100), pvals_only = TRUE) {
+    group = factor(rep(c("A", "B"), each = n_samples))
+    metadata = data.frame(group = group)
+    pval_vec = rep(NA, length(rvec))
+    for(i in seq_along(rvec)) {
+        X1 = dirmult::rdirichlet(n = n_samples, alpha = alpha1)
+        X2 = dirmult::rdirichlet(n = n_samples, alpha = alpha2)
+        X = rbind(X1, X2)
+        XV = X %*% Qeig$vectors
+        r = rvec[i]
+        dr = mpqDist:::get_dr(Qeig, r)
+        XVdsqrt = sweep(XV, MARGIN = 2, STATS = sqrt(dr), FUN = '*')
+        dist_obj = vegan::vegdist(XVdsqrt, method = "euclidean")
+        adonis_result <- adonis2(dist_obj ~ group, data = metadata, permutations = 999)
+        pval_vec[i] = adonis_result$Pr[1]
+    }
+    if(pvals_only) {
+        return(pval_vec)
+    } else {
+        return(data.frame(r = rvec, pval = pval_vec))
+    }
+}
+
+
+library(phyloseq)
+data(gentry)
+Q = ape::vcv(phy_tree(gentry))
+Qeig = eigen(Q)
+alpha1 = rep(1, nrow(Q))
+alpha2 = rep(1, nrow(Q))
+out = replicate(n = 100, get_maximizing_r_dirichlet(alpha1, alpha2, 5, Qeig))
+
+```
+
+Perfect binary tree
+```{r}
+k = 8
+p = 2^k
+tr = ape::stree(n = 2^k, type = "balanced")
+tr$edge.length = rep(1, nrow(tr$edge))
+Q = ape::vcv(tr)
+Qeig = eigen(Q)
+clades = Descendants(tr)
+best_r_vec = numeric(length(clades))
+clade_sizes = numeric(length(clades))
+pval_matrices_by_clade_size = list()
+for(i in 1:k) {
+    mu = rep(0, p)
+    mu[1:2^(i-1)] = 1
+    mu = mu / sqrt(sum(mu^2))
+    alpha1 = rep(10, p)
+    alpha2 = alpha1 + 5 * mu
+    alpha2 = alpha2 / sum(alpha2) * sum(alpha1)
+    pval_replicates = replicate(n = 500, get_maximizing_r_dirichlet(alpha1, alpha2, n_samples = 20, Qeig))
+    pval_matrices_by_clade_size[[i]] = pval_replicates
+}
+
+df_list = list()
+for(i in 1:k) {
+    power = apply(pval_matrices_by_clade_size[[i]], 1, function(x) mean(x <= .05))
+    df_list[[i]] = data.frame(power = power,
+                              r = mpqDist:::r_transform(0:100/100),
+                              clade_age = i)
+    df_list[[i]]$maximizing_r = df_list[[i]]$r[which.max(power)]
+}
+df = Reduce(rbind, df_list)
+p_dirichlet_more_detail = ggplot(df) + geom_point(aes(x = r, y = power), size = .8) +
+    geom_vline(aes(xintercept = maximizing_r)) + 
+    facet_wrap(~ clade_age)
+p_dirichlet_perfect = ggplot(df) +
+    geom_point(aes(x = clade_age, y = maximizing_r)) +
+    xlab("Clade age") +
+    ylab("Best r")
+
+```
+
+```{r, echo = FALSE, eval = FALSE}
+pdf("best-r-by-clade-size-dirichlet.pdf", width = 3, height = 2.3)
+p_dirichlet_perfect
+dev.off()
+pdf("best-r-dirichlet-more-detail.pdf", width = 5, height = 5)
+p_dirichlet_more_detail
+dev.off()
+```

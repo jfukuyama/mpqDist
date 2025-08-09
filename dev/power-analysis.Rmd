@@ -1,0 +1,279 @@
+---
+title: "Power analysis"
+output: 
+  tufte::tufte_html
+---
+
+
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  warning = FALSE
+)
+```
+
+# Setup
+
+```{r}
+library(ape)
+library(mpqDist)
+library(plotly)
+library(phyloseq)
+library(tidyverse)
+library(viridis)
+library(phangorn)
+library(patchwork)
+library(treeDA)
+library(ggbrace)
+set.seed(0)
+data(gentry)
+gentry
+```
+
+
+
+# Functions to compute the value of r with the most power
+
+In this document, we will look at a variety of different types of differences in mean between two communities and find the MPQr distance that has the most power to detect that difference.
+To do so, we first define some helper functions that will compute this value.
+We are doing it using a grid search across a collection of values of r ranging between 0 and 1.
+The last function defined below, `get_maximizing_r`, searches over the values of r for the one that maximizes the ratio between the expected value and the standard deviation of the test statistic.
+
+The idea here is that a test at a specified size $\alpha$ will correspond to a fixed cutoff $c_\alpha$.
+Since the quantiles of the generalized chi square distribution are non-trivial to compute, I'm using a normal approximation to the generalized chi square.
+In that case, so long as the cutoff is such that the test has at least 50\% power, the power will be monotone in the ratio between the mean and expected value.
+The function `mean_sd_ratio_tree_basis` computes this quantity.
+The `tree_basis` part of the name reminds us that the argument describing the difference in means has to be expressed in the basis corresponding to the eigenvectors of Q and not in the standard basis.
+This is just because the computation is more straightforward that way.
+To facilitate conversion between the standard basis and the basis given by the eigenvectors of Q, wa have `convert_to_tree_basis`, which takes a vector `mu` in the standard basis, an object `Qeig` giving the eigendecomposition of Q, and returns a vector corresponding to `mu` but expressed in the "tree basis".
+
+
+```{r, class.source = "fold"}
+#' Convert to Tree Basis
+#'
+#' Converts a vector `mu` expressed in the standard basis to the  "tree basis" defined by the eigenvectors of matrix Q.
+#' This transformation simplifies later computations that use the eigendecomposition of Q.
+#' @param mu A numeric vector representing a mean difference in the standard basis.
+#' @param Qeig A list (as from `eigen()`) giving the eigendecomposition of Q, where `Qeig$vectors` contains the eigenvectors.
+#' Q should be taken from `ape::vcv(tr)` (if tr is the tree we are using).
+#' @return A numeric vector representing `mu` in the tree (eigenvector) basis.
+convert_to_tree_basis <- function(mu, Qeig) {
+    mutilde <- t(Qeig$vectors)%*% mu
+}
+
+#' Mean/SD Ratio in Tree Basis
+#'
+#' Computes the ratio of expected value to standard deviation for the test statistic
+#' under a specified value of `r`, assuming the mean vector is expressed in the tree basis.
+#' This ratio is used to approximate the power of a test under a normal approximation.
+#'
+#' @param mutilde A numeric vector representing the mean difference in the tree basis.
+#' @param r A scalar between 0 and 1, specifying the interpolation parameter for the distance metric.
+#' @param d_noise A numeric vector of noise variances, specified in the tree basis.
+#' To save on computation, we require the noise to be diagonal in the tree basis (eigenvectors of Q).
+#' In other words, the noise covariance is Qeig$vectors %*% diag(d_noise) %*% t(Qeig$vectors).
+#' If all the elements of d_noise are equal, the implies that the noise covariance will be a scalar multiple of the identity.
+#' @param Qeig A list giving the eigendecomposition of Q.
+#'
+#' @return A numeric value representing the mean-to-standard deviation ratio of the test statistic.
+mean_sd_ratio_tree_basis <- function(mutilde, r, d_noise, Qeig) {
+    dr = mpqDist:::get_dr(Qeig, r)
+    w = dr * d_noise
+    exp_val = t(mutilde * dr) %*% mutilde
+    variance = 2 * sum(w^2)
+    return(exp_val / sqrt(variance))
+}
+
+#' Find Optimal r for Maximum Power
+#'
+#' Searches over a grid of values for `r` to find the one that maximizes the
+#' expected value to standard deviation ratio of the test statistic.
+#'
+#' @param mutilde A numeric vector representing the mean difference in the tree basis.
+#' @param d_noise A numeric vector of noise variances, specified in the basis corresponding to the eigenvectors of Q.
+#' In other words, the noise covariance is Qeig$vectors %*% diag(d_noise) %*% t(Qeig$vectors).
+#' @param Qeig A list giving the eigendecomposition of Q.
+#' @param rvec A numeric vector of candidate values for `r` to search over.
+#'        Defaults to a uniform grid from 0 to 1, transformed via `mpqDist:::r_transform`.
+#'
+#' @return The value of `r` that maximizes the expected value / standard deviation ratio.
+get_maximizing_r <- function(mutilde, d_noise, Qeig, rvec = mpqDist:::r_transform(0:100/100)) {
+    ratios = sapply(rvec, function(r) mean_sd_ratio_tree_basis(mutilde, r, d_noise, Qeig))
+    return(rvec[which.max(ratios)])
+}
+
+```
+
+```{r class.source = "fold.show"}
+p = ntaxa(gentry)
+Q = vcv(phy_tree(gentry))
+Qeig = eigen(Q)
+best_r_vec = numeric(p)
+for(i in 1:p) {
+    mutilde = rep(0, p)
+    mutilde[i] = 1
+    d_noise = rep(1, p)
+    d_noise = d_noise / sum(d_noise)
+    best_r_vec[i] = get_maximizing_r(mutilde, d_noise, Qeig)
+}
+ggplot(data.frame(best_r = best_r_vec, index = 1:p)) +
+    geom_point(aes(x = index, y = best_r))
+
+```
+
+
+## Make an example with the perfect binary tree
+
+```{r}
+k = 8
+p = 2^k
+tr = ape::stree(n = 2^k, type = "balanced")
+tr$edge.length = rep(1, nrow(tr$edge))
+Q = ape::vcv(tr)
+Qeig = eigen(Q)
+clades = Descendants(tr)
+best_r_vec = numeric(length(clades))
+clade_sizes = numeric(length(clades))
+for(i in 1:length(clades)) {
+    mu = 1:p %in% clades[[i]]
+    mu = mu / sqrt(sum(mu^2))
+    mutilde = convert_to_tree_basis(mu, Qeig)
+    d_noise = rep(1, p)
+    d_noise = d_noise / sum(d_noise)
+    best_r_vec[i] = get_maximizing_r(mutilde, d_noise, Qeig)
+    clade_sizes[i] = length(clades[[i]])
+}
+## for this tree, the stem age of a clade is equal to log2 of the clade size + 1
+clade_ages = log(clade_sizes, base = 2) + 1
+p_perfect = ggplot(data.frame(best_r = best_r_vec, clade_ages = clade_ages)) +
+#    scale_x_log10() +
+    xlab("Clade age") +
+    ylab("Best r") +
+    geom_point(aes(x = clade_ages, y = best_r))
+```
+
+## Same as above but with the Gentry tree
+
+
+```{r, message = FALSE}
+tr = phy_tree(gentry)
+p = ntaxa(gentry)
+Q = ape::vcv(tr)
+Qeig = eigen(Q)
+clades = Descendants(tr)
+best_r_vec = numeric(length(clades))
+clade_sizes = numeric(length(clades))
+time_since_divergence_of_mrca = numeric(length(clades))
+names = character(length(clades))
+tree_height = Q[1,1]
+for(i in 1:length(clades)) {
+    if(length(clades[[i]]) > 1) {
+        mrca = getMRCA(tr, clades[[i]])
+        name = ""
+    } else {
+        mrca = clades[[i]]
+        name = tr$tip.label[mrca]
+    }
+    parent_of_mrca = tr$edge[which(tr$edge[,2] == mrca),1]
+
+    mu = 1:p %in% clades[[i]]
+    mu = mu / sqrt(sum(mu^2))
+    mutilde = convert_to_tree_basis(mu, Qeig)
+    d_noise = rep(1, p)
+    d_noise = d_noise / sum(d_noise)
+    best_r_vec[i] = get_maximizing_r(mutilde, d_noise, Qeig)
+    clade_sizes[i] = length(clades[[i]])
+    names[i] = name
+    if(length(parent_of_mrca) > 0) {
+        time_since_divergence_of_mrca[i] = tree_height - adephylo::distRoot(tr, parent_of_mrca)
+    } else{
+        time_since_divergence_of_mrca[i] = tree_height
+    }
+}
+p_gentry =
+    ggplot(data.frame(best_r = best_r_vec, clade_fraction = clade_sizes / p)) +
+    geom_point(aes(x = clade_fraction, y = best_r)) +
+    scale_x_log10() +
+    xlab("Clade fraction") +
+    ylab("Best r") +
+    stat_smooth(aes(x = clade_fraction, y = best_r), method = "gam",  se = FALSE)
+
+p_gentry_2 =
+    ggplot(data.frame(best_r = best_r_vec, clade_age = time_since_divergence_of_mrca)) +
+    geom_point(aes(x = clade_age, y = best_r), size = 1) +
+    stat_smooth(aes(x = clade_age, y = best_r), method = "loess", se = FALSE) + 
+    xlab("Clade age") +
+    ylab("Best r")
+
+
+size_one_df = subset(data.frame(best_r = best_r_vec,
+                                time_since_divergence_of_mrca,
+                                clade_sizes,
+                                name = names),
+                     clade_sizes == 1)
+size_one_df$Group = as.vector(tax_table(gentry)[,"group"])
+size_one_df$Group[is.na(size_one_df$Group)] = "Angiosperms"
+size_one_df$Order = as.vector(tax_table(gentry)[,"order"])
+size_one_df |>
+    group_by(Order)|>
+    summarise(mean_best_r = round(mean(best_r), digits = 2), num_species = length(best_r)) |>
+    arrange(desc(mean_best_r)) |>
+    head(n = 12) |>
+    knitr::kable(format = "latex")
+
+orders_to_label = c("Pinales", "Ranunculales", "Gentianales", "Fagales", "Alismatales", "Sapindales", "Malpighiales")
+size_one_df$Order[!(size_one_df$Order %in% orders_to_label)] = NA
+leaf_positions = get_leaf_position(phy_tree(gentry), ladderize = FALSE)
+size_one_df_with_position = merge(size_one_df, leaf_positions, by.x = "name", by.y = "OTU")
+branch.colors = lapply(orders_to_label, function(o)
+                           size_one_df$name[which(size_one_df$Order == o)]
+                       )
+manual_palette = c(scales::hue_pal()(7), "gray")
+names(manual_palette) = c(orders_to_label, "Other")
+names(branch.colors) = manual_palette[1:length(branch.colors)]
+tr_plot = my_plot_tree(tr,
+                       ladderize = FALSE,
+                       branch.colors = branch.colors) +
+    coord_flip() +
+    scale_x_reverse() +
+    theme(panel.border = element_blank())
+
+## tr_plot = plot_tree(tr, ladderize = FALSE) + coord_flip() +
+##     scale_x_reverse() +
+##     theme(panel.border = element_blank())
+best_r_plot =
+    ggplot(size_one_df_with_position)+
+    geom_point(aes(y = best_r, x = otu.pos, color = fct_explicit_na(Order, na_level = "Other")), size = .7) +
+    xlab("") +
+    theme(axis.ticks.x = element_blank(),
+          axis.text.x = element_blank(),
+          panel.border = element_blank()) +
+    ylab("Best r") +
+    scale_color_manual(values = manual_palette, "Order") +
+    coord_cartesian(clip = "off")
+best_r_plot_with_braces = best_r_plot +
+    stat_brace(aes(x = otu.pos, y =0, color = Group, label = Group),width = .05, bending=3, distance = .03, rotate = 180) +
+    stat_bracetext(aes(x = otu.pos, y =0, color = Group, label = Group), distance = .08, rotate = 180) +
+    theme(legend.position = "none")
+
+best_r_legend = cowplot::get_legend(best_r_plot)
+best_r_and_tree_plot = combine_plot_and_tree(best_r_plot_with_braces, tr_plot, tree.height = 3)
+p_size_one = ggplot(size_one_df) +
+    geom_point(aes(x = time_since_divergence_of_mrca, y = best_r, shape = Group), na.rm = TRUE) +
+    scale_shape(na.translate = FALSE) + ylab("Best r") + xlab("Distance to parent node") +
+    ggtitle("Individual species in Gentry dataset tree")
+```
+
+```{r, echo = FALSE,  eval = FALSE}
+pdf("best-r-by-clade-size.pdf", width = 7, height=2.3)
+p_perfect + p_gentry_2
+dev.off()
+pdf("best-r-singletons-with-tree.pdf", width = 5.8, height = 3)
+best_r_and_tree_plot |> plot()
+dev.off()
+pdf("best-r-order-legend.pdf", width = 1.2, height = 3)
+plot(best_r_legend)
+dev.off()
+```
