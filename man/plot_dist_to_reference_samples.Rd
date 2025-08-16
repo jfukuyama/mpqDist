@@ -14,22 +14,21 @@ plot_dist_to_reference_samples(
 )
 }
 \arguments{
-\item{physeq}{A phyloseq object containing the abundances, a
+\item{physeq}{A phyloseq object containing species abundances, a
 phylogenetic tree, and sample data}
 
 \item{reference_samples}{Either the names or the indices of the set
 of reference samples.}
 
-\item{x_variable}{A variable for plotting the distances against on
-the x axis. Should be a string giving the name of one of the
-columns of \code{sample_data(phy_seq)}.}
+\item{x_variable}{A string giving the variable for plotting the
+distances against on the x axis. Should be the name of one of
+the columns of \code{sample_data(phy_seq)}.}
 
 \item{return_ggplot}{If TRUE, the function will return a ggplot
 object which can be made into an animated plot by calling
-ggplotly on the ggplot object. If FALSE, the function will
-create the animated plot. The option of returning the ggplot
-object is primarily to allow for more customization by the
-user.}
+ggplotly on it. If FALSE, the function will create the animated
+plot. The option of returning the ggplot object is primarily to
+allow for more customization by the user.}
 
 \item{...}{Extra objects to be passed to \code{aes_string} in ggplot.}
 }
@@ -40,4 +39,11 @@ Either an animated plot created by \code{ggplotly} (if
 \description{
 Makes an animated plot showing the the distances between each
 sample and a set of reference samples
+}
+\examples{
+data(gentry)
+gentry_log = gentry
+otu_table(gentry_log) = log(otu_table(gentry) + 1)
+equatorial_samples = sample_names(gentry_log)[which(sample_data(gentry_log)$Lat >= -10 & sample_data(gentry_log)$Lat <= 10)]
+plot_dist_to_reference_samples(physeq = gentry_log, reference_samples = equatorial_samples,x_variable = "Lat")
 }

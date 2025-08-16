@@ -2,15 +2,29 @@
 % Please edit documentation in R/mpqDist.R
 \name{make_animation_df}
 \alias{make_animation_df}
-\title{Sets up a data frame for plotly to make an animation}
+\title{Set up a data frame to make a plotly animation}
 \usage{
 make_animation_df(mpq_distances, fn, means_and_vars = NULL, ...)
 }
 \arguments{
+\item{mpq_distances}{The output from calling
+\code{get_mpq_distances}. Should be a list with elements
+\code{distances} and \code{r}, giving a list of distance
+objects and the corresponding values of r for the MPQr
+distance, respectively.}
+
 \item{fn}{A function to apply to each of the distance objects that
 creates a data frame with the variables in the animation. Its
 first argument should be a distance object. For example,
 \code{get_avg_distances_to_set}.}
+
+\item{means_and_vars}{Optional, defaults to NULL. If non-null,
+should be the output from the function
+\code{get_null_mean_and_variance}. It will add columns
+\code{null_mean}, \code{null_sd}, \code{median}, \code{lower},
+and \code{upper}, corresponding to those statistics of the null
+distribution for each value of r. Can be used to augment the
+plots with expected values under a null model.}
 
 \item{...}{Extra arguments that are passed to fn.}
 
@@ -23,5 +37,23 @@ A data frame that has one column called \code{frame} (which
 can be used by ggplot2 and plotly to make an animation).
 }
 \description{
-Sets up a data frame for plotly to make an animation
+Set up a data frame to make a plotly animation
+}
+\examples{
+data(small_otutab)
+data(small_tree)
+mpq_distances <- get_mpq_distances(small_otutab, small_tree)
+# we give make_animation_df the mpq distances and a function we
+# would like to apply to every distance matrix. The function
+# requires an extra argument in addition to the distance matrix, so
+# we pass that as `base_samples = c(1,2)` to specify that we want
+# to call `get_avg_distances_to_set` on each distance matrix with
+# the base samples set to be 1 and 2.
+animation_df = make_animation_df(mpq_distances = mpq_distances, fn = get_avg_distances_to_set, base_samples = c(1,2))
+# the resulting data frame has one column (frame) that corresponds
+# to the different values of r and which can be used for animating
+# the plot. The remaining columns are the columns created by `fn`
+# (in this example, `get_avg_distances_to_set`.)
+head(animation_df)
+
 }

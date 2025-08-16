@@ -1,4 +1,4 @@
-#' Gentry Forest Plot Dataset as a Phyloseq Object
+#' Gentry forest transect dataset as a phyloseq object
 #'
 #' A dataset containing species abundance data, phylogenetic tree, sample metadata, and taxonomy
 #' information for forest plots from the Gentry dataset. This dataset has been processed to
@@ -34,22 +34,21 @@
 #' Taxonomic lookups performed using the \code{\link[taxonlookup]{taxonlookup}} package.
 #'
 #' @examples
-#' \dontrun{
 #' library(phyloseq)
 #' data(gentry)
 #'
-#' # View the OTU table (species counts)
-#' otu_table(gentry)
+#' # view the OTU table (species counts)
+#' otu_table(gentry)[1:5, 1:20]
 #'
-#' # Plot the phylogenetic tree
-#' plot(phy_tree(gentry))
+#' # the phylogenetic tree
+#' phy_tree(gentry)
 #'
-#' # Summarize sample metadata
-#' sample_data(gentry)
+#' # view the sample data
+#' sample_data(gentry) |> head()
 #'
-#' # Extract taxonomic classifications
-#' tax_table(gentry)
-#' }
+#' # extract taxonomic classifications
+#' tax_table(gentry) |> head()
+#' 
 #'
 #' @keywords datasets phyloseq community ecology forest
 "gentry"
@@ -71,10 +70,9 @@
 #' @seealso \code{\link{gentry}}
 #'
 #' @examples
-#' \dontrun{
 #' dim(small_otutab)
+#' ## note that because we subsampled taxa, many of the sites are exactly the same and have no taxa
 #' head(small_otutab)
-#' }
 #'
 #' @keywords datasets example data
 "small_otutab"

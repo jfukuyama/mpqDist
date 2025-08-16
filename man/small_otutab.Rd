@@ -22,10 +22,9 @@ the OTU table from the \code{gentry} dataset using \code{subset_taxa()}.
 The resulting OTU table was coerced to a matrix for convenience.
 }
 \examples{
-\dontrun{
 dim(small_otutab)
+## note that because we subsampled taxa, many of the sites are exactly the same and have no taxa
 head(small_otutab)
-}
 
 }
 \seealso{

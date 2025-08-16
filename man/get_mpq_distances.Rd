@@ -7,13 +7,19 @@
 get_mpq_distances(X, tr, rvec = r_transform(0:100/100))
 }
 \arguments{
-\item{X}{A \eqn{n \times p} data matrix.}
+\item{X}{A n x p data matrix.}
 
 \item{tr}{A tree (of class \code{phylo}) with p leaves.}
+
+\item{rvec}{A vector of values between 0 and 1. For each value in
+this vector, the function will compute a distance matrix
+corresponding to the MPQr distance for that value of
+r. Defaults to a set of values of r that are spaced more
+closely close to 0 and 1 and more widely around .5 by applying
+\code{r_transform} to equally spaced values between 0 and 1.}
 }
 \value{
-A list containing distances between the rows of \code{X},
-and the value of \eqn{r} that was used (\code{r}).
+A list of length 2 whose elements are named \code{distances} and \code{r}. \code{distances} is a list of length \code{length(rvec)}, and each element contains a distance object giving the MPQr distances between the rows of \code{X} for one value of r. The second element of the list (\code{r}) gives the values of r that were used for computing the MPQr distances. These values are given in the same order as the distance objects in the \code{distance} element of the list.
 }
 \description{
 Compute MPQr distances for a range of values of r
@@ -21,6 +27,6 @@ Compute MPQr distances for a range of values of r
 \examples{
 data(small_otutab)
 data(small_tree)
-get_mpq_distances(small_otutab, small_tree, rvec = c(0,.5,1))
-
+mpq_distances <- get_mpq_distances(small_otutab, small_tree, rvec = c(0,.5,1))
+class(mpq_distances$distance[[1]])
 }

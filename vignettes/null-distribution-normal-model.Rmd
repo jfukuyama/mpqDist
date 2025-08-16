@@ -1,0 +1,110 @@
+---
+title: "Checking on null distributions under normal assumptions"
+output: tufte::tufte_html
+toc: true
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  warning = FALSE
+)
+```
+
+# A note
+
+This document is just here as a sanity check.
+The paper includes a power analysis that relies on the null distribution of MPQr distances under the assumption that the vectors we are using for the MPQr distances are normally distributed.
+I worked out what the distribution of the MPQr distances should be in that case, and this document gives a visual check that those computations were carried out correctly.
+However, I do not recommend using these for testing in actual data unless you have evidence that either your abundances/relative abundances or a transformation of those quantities are approximately normally distributed.
+This could be the case for transformed values, but it is very unlikely to be the case for untransformed relative abundances.
+If you want a real test, I would recommend PERMANOVA or something similar with the MPQr distances.
+
+
+# Setup
+
+```{r, message = FALSE, warning = FALSE}
+library(ape)
+library(mpqDist)
+library(plotly)
+library(phyloseq)
+library(tidyverse)
+library(viridis)
+library(phangorn)
+library(patchwork)
+library(treeDA)
+library(ggbrace)
+library(vegan)
+library(picante)
+set.seed(0)
+data(gentry)
+gentry
+```
+
+# Simulations
+
+We're going to start with some simulations just to check whether the null means and variances we get when we assume a normal distribution for the variables look right.
+To do this, we will generate "OTU tables" that are independent normal random variables, with potentially different standard deviations.
+We'll use the Gentry data as a skeleton (same tree, same number of samples and sites, same standard deviations for the species when we look into changing standard deviations).
+```{r}
+sim_homo = gentry
+sim_hetero = gentry
+n = nsamples(gentry)
+p = ntaxa(gentry)
+sds = apply(log(1 + otu_table(gentry)), 2, sd)
+sim_homo_matrix = matrix(rnorm(n = n * p), nrow = n, ncol = p)
+rownames(sim_homo_matrix) = sample_names(gentry)
+colnames(sim_homo_matrix) = taxa_names(gentry)
+sim_hetero_matrix = sweep(sim_homo_matrix, MARGIN = 2, STATS = sds, FUN = '*')
+otu_table(sim_homo) = otu_table(sim_homo_matrix, taxa_are_rows = FALSE)
+otu_table(sim_hetero) = otu_table(sim_hetero_matrix, taxa_are_rows = FALSE)
+```
+
+## Homoskedastic case
+
+For the first simulation, we will use simulated data where each variable has the same standard deviation (the "homoskedastic" setup).
+We will use `get_null_mean_and_variance` to compute the empirical standard deviations for each of the variables and compute what we expect the quantiles of the different MPQr distances to be if we assume the samples each come from a normal distribution with the same mean and standard deviations equal to our estimates.
+We then plot the actual distribution of the MPQr distance along with our expected median and where we expect the lower 2.5\% and upper 97.5\% quantile of the distribution to lie.
+We see that they match pretty well.
+Note that we are subsetting to `avg_dist > 0` just to exclude the base sample from the plot (it will always have a distance of 0 to itself, and so it shouldn't be included in the distribution).
+
+```{r}
+base_sample = 1
+nmv = get_null_mean_and_variance(sim_homo)
+mpq_distances = get_mpq_distances(otu_table(sim_homo), phy_tree(sim_homo))
+animation_df = make_animation_df(mpq_distances, get_avg_distances_to_set, means_and_vars = nmv, base_sample, sample_data(sim_homo)) |> subset(avg_dist > 0)
+p = ggplot(aes(x = Lat, y = avg_dist, color = Elev), data = animation_df) +
+    geom_point(aes(frame = frame)) +
+    geom_hline(aes(yintercept = median, frame = frame)) +
+    geom_hline(aes(yintercept = upper, frame = frame)) +
+    geom_hline(aes(yintercept = lower, frame = frame)) +
+    stat_smooth(aes(frame = frame), se = FALSE) +
+    scale_x_reverse() +
+    scale_color_viridis()
+ggplotly(p)
+```
+
+
+## Heteroskedastic case
+
+For the second simulation, we do the same procedure as in the previous section, with the difference that each variable has a different standard deviation (the "heteroskedastic" setup).
+We again use `get_null_mean_and_variance` to compute the expected quantiles of the distribution of the different MPQr distances.
+We plot the actual distribution along with the median and upper and lower quantiles.
+As before, we see that they match pretty well.
+```{r}
+base_sample = 1
+nmv = get_null_mean_and_variance(sim_hetero)
+mpq_distances = get_mpq_distances(otu_table(sim_hetero), phy_tree(sim_hetero))
+animation_df = make_animation_df(mpq_distances, get_avg_distances_to_set, means_and_vars = nmv, base_sample, sample_data(sim_hetero)) |> subset(avg_dist > 0)
+
+p = ggplot(aes(x = Lat, y = avg_dist, color = Elev), data = animation_df) +
+    geom_point(aes(frame = frame)) +
+    geom_hline(aes(yintercept = median, frame = frame)) +
+    geom_hline(aes(yintercept = upper, frame = frame)) +
+    geom_hline(aes(yintercept = lower, frame = frame)) +
+    stat_smooth(aes(frame = frame), se = FALSE) +
+    scale_x_reverse() +
+    scale_color_viridis()
+ggplotly(p)
+```

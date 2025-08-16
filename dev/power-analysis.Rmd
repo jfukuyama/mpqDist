@@ -27,6 +27,7 @@ library(phangorn)
 library(patchwork)
 library(treeDA)
 library(ggbrace)
+source("modified_plot_tree.R")
 set.seed(0)
 data(gentry)
 gentry
@@ -251,11 +252,15 @@ best_r_plot =
           axis.text.x = element_blank(),
           panel.border = element_blank()) +
     ylab("Best r") +
+    ylim(c(-.3, .6)) +
     scale_color_manual(values = manual_palette, "Order") +
     coord_cartesian(clip = "off")
 best_r_plot_with_braces = best_r_plot +
     stat_brace(aes(x = otu.pos, y =0, color = Group, label = Group),width = .05, bending=3, distance = .03, rotate = 180) +
-    stat_bracetext(aes(x = otu.pos, y =0, color = Group, label = Group), distance = .08, rotate = 180) +
+    stat_bracetext(aes(x = otu.pos, y = 0, color = Group, label = Group),
+                   distance = .08,
+                   textdistance = -.8,
+                   rotate = 180) +
     theme(legend.position = "none")
 
 best_r_legend = cowplot::get_legend(best_r_plot)

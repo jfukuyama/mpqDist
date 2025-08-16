@@ -3,7 +3,7 @@
 \docType{data}
 \name{gentry}
 \alias{gentry}
-\title{Gentry Forest Plot Dataset as a Phyloseq Object}
+\title{Gentry forest transect dataset as a phyloseq object}
 \format{
 A \code{\link[phyloseq]{phyloseq-class}} object containing:
 \describe{
@@ -43,22 +43,21 @@ community ecology, and evolutionary relationships among species in
 forest plots.
 }
 \examples{
-\dontrun{
 library(phyloseq)
 data(gentry)
 
-# View the OTU table (species counts)
-otu_table(gentry)
+# view the OTU table (species counts)
+otu_table(gentry)[1:5, 1:20]
 
-# Plot the phylogenetic tree
-plot(phy_tree(gentry))
+# the phylogenetic tree
+phy_tree(gentry)
 
-# Summarize sample metadata
-sample_data(gentry)
+# view the sample data
+sample_data(gentry) |> head()
 
-# Extract taxonomic classifications
-tax_table(gentry)
-}
+# extract taxonomic classifications
+tax_table(gentry) |> head()
+
 
 }
 \keyword{community}

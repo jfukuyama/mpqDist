@@ -7,12 +7,16 @@
 mpq_and_sample_distances(d_obj, sample_distances)
 }
 \arguments{
+\item{d_obj}{A distance object containing the MPQr distances
+between the samples.}
+
 \item{sample_distances}{A distance object containing the distances
 between samples.}
-
-\item{mpqr_distances}{A distance object containing the MPQr
-distances between the samples.}
+}
+\value{
+A data frame
 }
 \description{
 Creates a data frame containing MPQr and sample distances
 }
+\keyword{internal}

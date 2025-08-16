@@ -15,3 +15,4 @@ Another value between 0 and 1.
 \description{
 A transformation that tends to work better than a linear grid between 0 and 1
 }
+\keyword{internal}

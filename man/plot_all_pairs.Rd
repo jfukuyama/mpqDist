@@ -5,24 +5,20 @@
 \title{Creates an animated plot of MPQ distances against some other
 measure of distance between sites}
 \usage{
-plot_all_pairs(physeq, sample_distances, return_ggplot = FALSE, ...)
+plot_all_pairs(physeq, sample_distances, return_ggplot = FALSE)
 }
 \arguments{
-\item{physeq}{A phyloseq object.}
+\item{physeq}{A phyloseq object containing species abundances, a
+phylogenetic tree, and sample data.}
+
+\item{sample_distances}{Either a distance object or a (n_samples x
+n_samples) matrix containing distances between the samples.}
 
 \item{return_ggplot}{If TRUE, the function will return a ggplot
 object which can be made into an animated plot by calling
-ggplotly on the ggplot object. If FALSE, the function will
-create the animated plot. The option of returning the ggplot
-object is primarily to allow for more customization by the
-user.}
-
-\item{distance_variables}{Names of columns in sample_data(physeq)
-to use to compute distances}
-
-\item{distance_fn}{A function that takes a matrix and computes
-distances between all pairs of rows. It should return an object
-of class 'dist'.}
+ggplotly on it. If FALSE, the function will create the animated
+plot. The option of returning the ggplot object is primarily to
+allow for more customization by the user.}
 }
 \value{
 Either an animated plot created by \code{ggplotly} (if
@@ -31,4 +27,10 @@ Either an animated plot created by \code{ggplotly} (if
 \description{
 Creates an animated plot of MPQ distances against some other
 measure of distance between sites
+}
+\examples{
+data(gentry)
+gentry_small = subset_samples(gentry, Precip > 4000)
+longitude_distance = dist(sample_data(gentry_small)$Long)
+plot_all_pairs(gentry_small, longitude_distance)
 }

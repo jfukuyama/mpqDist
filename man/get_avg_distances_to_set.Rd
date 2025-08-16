@@ -2,8 +2,7 @@
 % Please edit documentation in R/mpqDist.R
 \name{get_avg_distances_to_set}
 \alias{get_avg_distances_to_set}
-\title{Average distance between each individual point and a set of base
-samples}
+\title{Get average distance to set}
 \usage{
 get_avg_distances_to_set(d_obj, base_samples, sample_data = NULL)
 }
@@ -22,11 +21,28 @@ want to plot average distances against other covariates.}
 A data frame with one column containing the average
 distances between each sample and the base
 samples. Specifically, for sample i, the average distance is
-sum_{bs in base_samples} d(i, bs) / |base_samples|. Remaining
+\ifelse{html}{
+       \out{\(\sum_{bs \in \text{base_samples}} d(i, bs) / |\text{base_samples}|\)}
+    }{
+       \eqn{sum_{bs \in \text{base_samples}} d(i, bs) / |\text{base_samples}|}
+    }. Remaining
 columns in the data frame are sample names and sample_data (if
 it was provided.)
 }
 \description{
-Average distance between each individual point and a set of base
-samples
+Computes the average distance between each individual point and a
+set of base samples.
+}
+\examples{
+data(small_otutab)
+data(small_tree)
+mpqr_distances = get_mpq_distances(small_otutab, small_tree, rvec = c(0, .5, 1))
+# get the MPQr distances with r = .5
+d_obj = mpqr_distances$distances[["0.5"]]
+## for each site, get the average of the distances between that site and the base sites (sites 1 and 2)
+get_avg_distances_to_set(d_obj, base_samples = c(1,2)) |> head()
+## compare to doing this by hand for site 3:
+(d_3_12 = as.matrix(d_obj)[3, c(1,2)])
+mean(d_3_12)
+mean(d_3_12) == get_avg_distances_to_set(d_obj, base_samples = c(1,2))$avg_dist[3]
 }

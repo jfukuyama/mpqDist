@@ -16,6 +16,10 @@ VignetteBuilder: knitr
 Depends: 
     R (>= 3.5)
 Imports:
-    CompQuadForm
+    CompQuadForm,
+    phyloseq,
+    stats,
+    ggplot2,
+    plotly
 LazyData: true
 URL: https://jfukuyama.github.io/mpqDist/

@@ -1,7 +1,7 @@
 ---
-title: "Interactive plot tutorial"
+title: "How to make interactive plots based on MPQr distances"
 output: tufte::tufte_html
-toc: false
+toc: true
 vignette: >
   %\VignetteIndexEntry{gentry}
   %\VignetteEngine{knitr::rmarkdown}
@@ -80,7 +80,7 @@ There is not a good theoretical reason for this, but it has worked well in all t
 distances = get_mpq_distances(otu_table(gentry_log), phy_tree(gentry_log))
 ```
 
-# Making an interactive plot
+# Built-in functions for interactive plots
 
 It is easiest to visualize the family of distances with an animated plot.
 This package includes some helper functions that allow the user to make a couple of different kinds of plots and gives templates so as to allow the user to make custom versions if the ones included here are not suitable.
@@ -159,13 +159,13 @@ p = p + stat_smooth(aes(frame = frame), se = FALSE)
 ggplotly(p)
 ```
 
-## Helper functions for custom plots
+# Helper functions for custom interactive plots
 
 The package also includes helper functions that allow for more customization, but since the interactive plots are based on ggplotly, some knowledge of how ggplotly works is necessary to use these functions.
 Briefly, to convert a standard ggplot2 plot to an animated plot with ggplotly, you modify the plotting data frame so that it has an extra column that specifies the "frame" of the animation, add that as part of the aesthetic mapping (e.g. `aes(frame = frame)`) in the ggplot, and then call the `ggplotly` function on the resulting `ggplot` object.
 For more details, see the [ggplotly documentation on animations](https://plotly.com/ggplot2/animations/).
 
-### The `make_animation_df` function
+## The `make_animation_df` function
 
 The `make_animation_df` can help make this sort of data frame.
 Its first argument is the output of `get_mpq_distances` (a list with elements `distances` and `r`), and its second argument is a function that takes a single distance object and returns a data frame with the variables needed to make one frame of the animation.
@@ -175,7 +175,7 @@ This function will be applied to each of the elements of the `distances` slot of
 Once this data frame has been created, the user can make an animated plot by adding `frame = frame` to the aesthetic specification of the ggplot they would use for a static plot.
 Calling `ggplotly` on the resulting ggplot object will make an animated plot.
 
-### Function to create plotting variables
+## Function to create plotting variables
 
 In the code block below, we show an example of creating the data frame that we need to make an interactive plot.
 The `make_animation_df` function in the last line of that block takes as its first argument `mpq_distances` (the output from the `get_mpq_distances` function).
@@ -221,7 +221,7 @@ mpq_distances$r = c(mpq_distances$r, "bray")
 gentry_order_glom = tax_glom(gentry, taxrank = "order")
 gentry_log_order_glom = gentry_order_glom
 otu_table(gentry_log_order_glom) = otu_table(clr(otu_table(gentry_order_glom) + 1), taxa_are_rows = FALSE)
-## ## agglomerate the untransformed data to order level, then clr-transform the agglomerated data
+## agglomerate the untransformed data to order level, then clr-transform the agglomerated data
 gentry_group_glom = tax_glom(gentry, taxrank = "group")
 gentry_log_group_glom = gentry_group_glom
 otu_table(gentry_log_group_glom) = otu_table(clr(otu_table(gentry_group_glom) + 1), taxa_are_rows = FALSE)
