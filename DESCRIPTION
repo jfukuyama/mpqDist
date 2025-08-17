@@ -21,6 +21,16 @@ Imports:
     stats,
     ggplot2,
     plotly,
-    tidyverse
+    tidyverse,
+    ape,
+    viridis,
+    phangorn,
+    patchwork,
+    treeDA,
+    ggbrace,
+    vegan,
+    picante,
+    fields,
+    compositions
 LazyData: true
 URL: https://jfukuyama.github.io/mpqDist/
