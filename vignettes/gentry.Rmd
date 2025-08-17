@@ -1,6 +1,6 @@
 ---
 title: "How to make interactive plots based on MPQr distances"
-output: tufte::tufte_html
+output: rmarkdown::html_vignette
 toc: true
 vignette: >
   %\VignetteIndexEntry{gentry}

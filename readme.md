@@ -9,6 +9,14 @@ Given a template, the package uses `plotly` to create an interactive plot that a
 
 The package can be installed using `devtools::install_github('jfukuyama/mpqDist')`.
 
+It requires the bioconductor package `phyloseq`, so if you get an error that says that `phyloseq` is not available, you need to install it from bioconductor using
+```
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("phyloseq")
+```
+
 # Vignettes
 
 Vignettes showing simulations and real data analysis are available in the `vignettes` folder.

@@ -1,7 +1,11 @@
 ---
 title: "Simulation examples for MPQ distances"
-output: tufte::tufte_html
-toc: false
+output: rmarkdown::html_vignette
+toc: true
+vignette: >
+  %\VignetteIndexEntry{simulations}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
 ---
 
 ```{r, include = FALSE}
