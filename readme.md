@@ -5,6 +5,8 @@ The MPQ distances are a family of distance with a continuous tuning parameter wh
 The package allows the user to give a template for a plot which will be filled in with the full spectrum of tuning parameters.
 Given a template, the package uses `plotly` to create an interactive plot that allows the user to scan through versions of the plot filled in with all the members of the family.
 
+More detailed documentation can be found [here](https://jfukuyama.github.io/mpqDist/).
+
 # Installation
 
 The package can be installed using `devtools::install_github('jfukuyama/mpqDist')`.
